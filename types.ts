@@ -14,6 +14,8 @@ export interface Project {
   url: string;
   category: string;
   githubStats?: GithubStats;
+  os?: string[]; // Operating System
+  keywords?: string[]; // Hidden search keywords
 }
 
 export interface Episode {

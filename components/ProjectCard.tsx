@@ -1,5 +1,5 @@
 import React from 'react';
-import { ExternalLink, Maximize2, Calendar, Layers } from 'lucide-react';
+import { ExternalLink, Maximize2, Command, AppWindow, Terminal, Globe, Smartphone, Monitor, ChevronRight, Hash } from 'lucide-react';
 import { Project } from '../types';
 
 interface ProjectCardProps {
@@ -11,11 +11,9 @@ interface ProjectCardProps {
 }
 
 const ProjectCard: React.FC<ProjectCardProps> = ({ project, episodeTitle, date, onClick, searchTerm = '' }) => {
-  // Helper to highlight text
+  // Highlight helper
   const getHighlightedText = (text: string, highlight: string) => {
-    if (!highlight.trim()) {
-      return text;
-    }
+    if (!highlight.trim()) return text;
     const escapedHighlight = highlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const regex = new RegExp(`(${escapedHighlight})`, 'gi');
     const parts = text.split(regex);
@@ -23,7 +21,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, episodeTitle, date, 
     return parts.map((part, index) => {
       if (part.toLowerCase() === highlight.toLowerCase()) {
         return (
-          <mark key={index} className="bg-yellow-300 dark:bg-yellow-600/80 text-gray-900 dark:text-white rounded-sm px-0.5 font-medium">
+          <mark key={index} className="bg-acid text-black font-bold px-1">
             {part}
           </mark>
         );
@@ -32,88 +30,124 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, episodeTitle, date, 
     });
   };
 
-  const getCategoryColor = (category: string) => {
+  const getBadgeStyles = (category: string) => {
     const normalized = category.toLowerCase();
-    if (normalized.includes('vision') || normalized.includes('video')) return 'bg-pink-100 text-pink-800 dark:bg-pink-900/50 dark:text-pink-200 border-pink-200 dark:border-pink-800';
-    if (normalized.includes('audio') || normalized.includes('speech')) return 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200 border-amber-200 dark:border-amber-800';
-    if (normalized.includes('coding') || normalized.includes('agent')) return 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200 border-blue-200 dark:border-blue-800';
-    if (normalized.includes('dev tool') || normalized.includes('cli')) return 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700';
-    if (normalized.includes('web') || normalized.includes('browser')) return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200 border-emerald-200 dark:border-emerald-800';
-    if (normalized.includes('security')) return 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200 border-red-200 dark:border-red-800';
-    if (normalized.includes('system') || normalized.includes('os')) return 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 border-zinc-200 dark:border-zinc-700';
-    if (normalized.includes('ai model') || normalized.includes('ml')) return 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200 border-purple-200 dark:border-purple-800';
-    if (normalized.includes('design') || normalized.includes('ui')) return 'bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-900/50 dark:text-fuchsia-200 border-fuchsia-200 dark:border-fuchsia-800';
     
-    return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-700';
+    // Base styles: Solid black box, white text, colored border
+    // Shadow is 2px solid white (or black in light mode for contrast if needed, but per request using white aesthetic or just high contrast)
+    // Actually, on light backgrounds, a white shadow is invisible. 
+    // To match the high-contrast "Cyberpunk/Industrial" look:
+    // We use a black shadow in Light Mode, and White Shadow in Dark Mode.
+    // However, if the user requested "half amount of white border", they likely see it as white.
+    // I will use a shadow that contrasts with the card header.
+    
+    const base = "border-2 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition-all hover:translate-x-[1px] hover:translate-y-[1px] bg-black text-white shadow-[2px_2px_0px_0px_#000] dark:shadow-[2px_2px_0px_0px_#fff] hover:shadow-[1px_1px_0px_0px_#000] dark:hover:shadow-[1px_1px_0px_0px_#fff]";
+    
+    // Border Color Logic
+    if (normalized.includes('vision') || normalized.includes('video')) return `${base} border-purple-600`;
+    if (normalized.includes('audio') || normalized.includes('speech')) return `${base} border-safety`;
+    if (normalized.includes('coding') || normalized.includes('agent')) return `${base} border-acid`;
+    if (normalized.includes('web')) return `${base} border-cyan-600`;
+    if (normalized.includes('security')) return `${base} border-red-600`;
+    if (normalized.includes('data')) return `${base} border-emerald-600`;
+    if (normalized.includes('design') || normalized.includes('ui')) return `${base} border-pink-600`;
+    if (normalized.includes('ai') || normalized.includes('model')) return `${base} border-indigo-600`;
+    
+    return `${base} border-concrete-600`;
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (onClick && (e.key === 'Enter' || e.key === ' ')) {
-      e.preventDefault();
-      onClick();
+  const getOsIcon = (os: string) => {
+    switch(os) {
+      case 'macOS': return <Command className="w-3 h-3" />;
+      case 'Windows': return <AppWindow className="w-3 h-3" />;
+      case 'Linux': return <Terminal className="w-3 h-3" />;
+      case 'Web': return <Globe className="w-3 h-3" />;
+      case 'Mobile': return <Smartphone className="w-3 h-3" />;
+      default: return <Monitor className="w-3 h-3" />;
     }
   };
 
   return (
     <div 
       onClick={onClick}
-      onKeyDown={handleKeyDown}
-      role="button"
-      tabIndex={0}
-      className="flex flex-col bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-all duration-200 overflow-hidden h-full group cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+      className="group relative h-full flex flex-col cursor-pointer focus:outline-none select-none"
     >
-      <div className="p-5 flex-1 flex flex-col">
-        <div className="flex justify-between items-start mb-3 gap-2">
-          <div className="flex flex-wrap items-center gap-2 overflow-hidden">
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border shrink-0 ${getCategoryColor(project.category)}`}>
-              {project.category}
-            </span>
-            {date && (
-               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400 border border-gray-200 dark:border-gray-700 shrink-0">
-                 {date}
-               </span>
-            )}
-            {episodeTitle && (
-              <span 
-                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-800 shrink-0 max-w-[160px]"
-                title={episodeTitle}
-              >
-                <Layers className="w-3 h-3 mr-1.5 shrink-0" />
-                <span className="truncate">
-                  {getHighlightedText(episodeTitle, searchTerm)}
-                </span>
-              </span>
-            )}
+      {/* Hard Shadow Block - Dynamic Color on Hover */}
+      <div className="absolute inset-0 bg-black dark:bg-acid translate-x-2 translate-y-2 group-hover:translate-x-3 group-hover:translate-y-3 transition-transform duration-100 ease-linear"></div>
+      
+      {/* Main Card Chassis */}
+      <div className="relative h-full flex flex-col bg-white dark:bg-concrete-900 border-2 border-black dark:border-concrete-100 p-0 transition-transform duration-100 ease-linear group-hover:-translate-x-1 group-hover:-translate-y-1 overflow-hidden">
+        
+        {/* Header Bar */}
+        <div className="flex justify-between items-stretch border-b-2 border-black dark:border-concrete-100 bg-concrete-50 dark:bg-black h-12">
+          
+          {/* ID Section: Stacked & Technical */}
+          <div className="flex items-center px-4 border-r-2 border-black dark:border-concrete-100 bg-white dark:bg-concrete-900 relative">
+             {/* Tech Decoration: Corner marker */}
+             <div className="absolute top-1 left-1 w-1 h-1 bg-concrete-300 dark:bg-concrete-700"></div>
+             
+             <div className="flex flex-col justify-center h-full pt-1">
+                <span className="text-[7px] font-bold text-concrete-400 uppercase tracking-widest leading-none mb-0.5">Ref.ID</span>
+                <div className="flex items-center gap-1.5">
+                  <Hash className="w-3 h-3 text-concrete-300 dark:text-concrete-600" />
+                  <span className="font-mono text-xl font-black text-black dark:text-white tracking-tighter leading-none">
+                    {project.rank.replace(/[^0-9]/g, '').padStart(3, '0')}
+                  </span>
+                </div>
+             </div>
           </div>
-          {/* Visual affordance for expanding the card */}
-          <div className="p-1 rounded-full bg-gray-50 dark:bg-gray-800 text-gray-400 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/30 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-            <Maximize2 className="h-4 w-4" />
+
+          {/* Category Section: Right Aligned with Pattern Background */}
+          <div className="flex-1 flex items-center justify-end px-3 gap-2 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9IjAuMDUiLz4KPC9zdmc+')] dark:bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMDUiLz4KPC9zdmc+')]">
+             <span className={getBadgeStyles(project.category)}>
+                {project.category}
+             </span>
           </div>
         </div>
-        
-        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 line-clamp-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-          {getHighlightedText(project.name, searchTerm)}
-        </h3>
-        
-        <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed flex-1 line-clamp-3">
-          {getHighlightedText(project.description, searchTerm)}
-        </p>
-      </div>
-      
-      <div className="bg-gray-50 dark:bg-gray-700/50 px-5 py-3 border-t border-gray-100 dark:border-gray-700 flex justify-between items-center">
-        <span className="text-xs font-medium text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-          View Details
-        </span>
-        <a 
-          href={project.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-          className="inline-flex items-center text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors z-10 focus:outline-none focus:underline"
-        >
-          Source <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
-        </a>
+
+        {/* Content Body */}
+        <div className="p-5 flex flex-col flex-1 relative">
+           {/* Decorative Left Border Line */}
+           <div className="absolute top-0 left-0 bottom-0 w-[2px] bg-transparent group-hover:bg-acid transition-colors duration-300"></div>
+
+          <h3 className="text-xl md:text-2xl font-black uppercase leading-[0.9] mb-4 text-black dark:text-white group-hover:text-acid-dark dark:group-hover:text-acid transition-colors pt-1">
+            {getHighlightedText(project.name, searchTerm)}
+          </h3>
+          
+          {/* Technical Divider */}
+          <div className="flex items-center gap-2 mb-4 opacity-60">
+             <div className="h-1.5 w-1.5 bg-black dark:bg-white"></div>
+             <div className="h-[2px] w-8 bg-black dark:bg-white"></div>
+             <div className="h-[1px] flex-1 bg-concrete-300 dark:bg-concrete-700"></div>
+          </div>
+
+          <p className="font-mono text-xs leading-relaxed text-concrete-700 dark:text-concrete-300 line-clamp-4 mb-5 font-medium">
+            {getHighlightedText(project.description, searchTerm)}
+          </p>
+
+          <div className="mt-auto pt-2 flex justify-between items-end">
+             {/* OS Icons: Port Style */}
+            <div className="flex -space-x-[2px] pb-1">
+              {project.os?.slice(0, 3).map((os, i) => (
+                <div key={os} 
+                     className="relative w-8 h-8 flex items-center justify-center bg-concrete-50 dark:bg-concrete-800 border-2 border-black dark:border-concrete-500 hover:z-10 hover:border-acid hover:text-black hover:bg-acid transition-all" 
+                     title={os}
+                >
+                  {/* Port Detail */}
+                  <div className="absolute top-0.5 right-0.5 w-[1px] h-[1px] bg-concrete-400"></div>
+                  <div className="absolute bottom-0.5 left-0.5 w-[1px] h-[1px] bg-concrete-400"></div>
+                  {getOsIcon(os)}
+                </div>
+              ))}
+            </div>
+            
+            {/* Action Button Style */}
+            <div className="flex items-center gap-1 text-[10px] font-black uppercase bg-black text-white dark:bg-white dark:text-black px-3 py-1.5 border-2 border-transparent hover:border-acid hover:text-acid dark:hover:text-acid-dark transition-colors">
+              <span>Inspect</span>
+              <ChevronRight className="w-3 h-3" />
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

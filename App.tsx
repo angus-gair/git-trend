@@ -1,15 +1,13 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { RefreshCw, Search as SearchIcon, Layers, AlertCircle, Filter, Loader2, Sun, Moon, CheckCircle } from 'lucide-react';
+import { RefreshCw, Search as SearchIcon, Layers, AlertCircle, Filter, Loader2, Sun, Moon, CheckCircle, Terminal, Cpu } from 'lucide-react';
 import { INITIAL_EPISODES } from './constants';
 import { Episode, Project, GithubStats } from './types';
 import { fetchTrendingEpisodes } from './services/geminiService';
 import SearchBar from './components/SearchBar';
-import ProjectGroupList from './components/EpisodeList'; // Renamed import, file is same
+import ProjectGroupList from './components/EpisodeList';
 import ProjectModal from './components/ProjectModal';
 import ChatAssistant from './components/ChatAssistant';
 import ViewControls, { GroupByOption, ProjectSortOption } from './components/ViewControls';
-
-const ITEMS_PER_PAGE = 24; // Increased since we are doing a continuous feed usually
 
 // LocalStorage Keys
 const LS_KEYS = {
@@ -17,7 +15,24 @@ const LS_KEYS = {
   SEARCH: 'gitTrend_search',
   GROUP_BY: 'gitTrend_groupBy',
   PROJECT_SORT: 'gitTrend_projectSort',
+  OS_FILTER: 'gitTrend_osFilter',
   THEME: 'gitTrend_theme',
+};
+
+// Theme Color Map
+const THEME_PALETTE: Record<string, { main: string; dim: string; dark: string }> = {
+  default: { main: '#ccff00', dim: '#a3cc00', dark: '#7a9900' }, // Acid Green
+  vision: { main: '#d946ef', dim: '#c026d3', dark: '#a21caf' },   // Neon Purple
+  video: { main: '#d946ef', dim: '#c026d3', dark: '#a21caf' },
+  audio: { main: '#f97316', dim: '#ea580c', dark: '#c2410c' },    // Neon Orange
+  speech: { main: '#f97316', dim: '#ea580c', dark: '#c2410c' },
+  web: { main: '#06b6d4', dim: '#0891b2', dark: '#0e7490' },      // Cyan
+  security: { main: '#ef4444', dim: '#dc2626', dark: '#b91c1c' }, // Red
+  data: { main: '#10b981', dim: '#059669', dark: '#047857' },     // Emerald
+  design: { main: '#ec4899', dim: '#db2777', dark: '#be185d' },   // Pink
+  ui: { main: '#ec4899', dim: '#db2777', dark: '#be185d' },
+  ai: { main: '#8b5cf6', dim: '#7c3aed', dark: '#6d28d9' },       // Violet
+  model: { main: '#8b5cf6', dim: '#7c3aed', dark: '#6d28d9' },
 };
 
 // Helper to load state safely
@@ -31,30 +46,52 @@ const loadState = <T,>(key: string, fallback: T): T => {
   }
 };
 
+// --- OS Derivation Helper ---
+const deriveOS = (text: string): string[] => {
+  const lower = text.toLowerCase();
+  const os: string[] = [];
+  
+  if (lower.includes('macos') || lower.includes('mac ') || lower.includes('apple silicon')) os.push('macOS');
+  if (lower.includes('windows') || lower.includes('.exe')) os.push('Windows');
+  if (lower.includes('linux') || lower.includes('ubuntu') || lower.includes('debian')) os.push('Linux');
+  if (lower.includes('web') || lower.includes('browser') || lower.includes('chrome') || lower.includes('react') || lower.includes('next.js')) os.push('Web');
+  if (lower.includes('android') || lower.includes('ios') || lower.includes('mobile')) os.push('Mobile');
+  
+  // Implicit cross-platform indicators
+  if (lower.includes('cross-platform') || lower.includes('multi-platform') || lower.includes('rust') || lower.includes('go ') || lower.includes('python')) {
+     if (os.length === 0) os.push('Cross-platform');
+  }
+  
+  if (os.length === 0) return ['Cross-platform'];
+  return os;
+};
+
 // --- Stats Generator Helper ---
 const generateStatsIfMissing = (project: Project): Project => {
-  if (project.githubStats) return project;
-
   const now = new Date();
   const randomDaysAgo = Math.floor(Math.random() * 200);
   const lastCommitDate = new Date(now);
   lastCommitDate.setDate(now.getDate() - randomDaysAgo);
 
-  // Random creation date between 1 and 3 years ago
   const randomCreationDays = Math.floor(Math.random() * 700) + 30;
   const createdAtDate = new Date(now);
   createdAtDate.setDate(now.getDate() - randomCreationDays);
+  
+  const stats = project.githubStats ? project.githubStats : {
+    stars: Math.floor(Math.random() * 5000) + 100,
+    forks: Math.floor(Math.random() * 500) + 20,
+    issues: Math.floor(Math.random() * 50),
+    watchers: Math.floor(Math.random() * 200) + 10,
+    lastCommit: lastCommitDate.toISOString(),
+    createdAt: createdAtDate.toISOString(),
+  };
+
+  const os = project.os && project.os.length > 0 ? project.os : deriveOS(project.description + " " + project.name);
 
   return {
     ...project,
-    githubStats: {
-      stars: Math.floor(Math.random() * 5000) + 100,
-      forks: Math.floor(Math.random() * 500) + 20,
-      issues: Math.floor(Math.random() * 50),
-      watchers: Math.floor(Math.random() * 200) + 10,
-      lastCommit: lastCommitDate.toISOString(),
-      createdAt: createdAtDate.toISOString(),
-    }
+    githubStats: stats,
+    os: os
   };
 };
 
@@ -65,13 +102,10 @@ const App: React.FC = () => {
     loadState(LS_KEYS.EPISODES, INITIAL_EPISODES)
   );
 
-  // Flattened and enriched projects
-  // We use useMemo to avoid regenerating random stats on every render
   const allProjects = useMemo(() => {
     const projects: (Project & { episodeTitle: string, discoveredDate: string })[] = [];
     episodes.forEach(ep => {
       ep.projects.forEach(p => {
-        // Enrich with stats if missing so grouping works
         const enriched = generateStatsIfMissing(p);
         projects.push({
           ...enriched,
@@ -92,6 +126,9 @@ const App: React.FC = () => {
   
   const [groupBy, setGroupBy] = useState<GroupByOption>(() => loadState(LS_KEYS.GROUP_BY, 'none'));
   const [projectSort, setProjectSort] = useState<ProjectSortOption>(() => loadState(LS_KEYS.PROJECT_SORT, 'rank'));
+  
+  // OS Filter State
+  const [osFilter, setOsFilter] = useState<string>(() => loadState(LS_KEYS.OS_FILTER, 'ALL'));
 
   const [selectedProject, setSelectedProject] = useState<{project: Project, episodeTitle?: string} | null>(null);
 
@@ -113,6 +150,7 @@ const App: React.FC = () => {
   useEffect(() => { localStorage.setItem(LS_KEYS.SEARCH, JSON.stringify(inputValue)); }, [inputValue]);
   useEffect(() => { localStorage.setItem(LS_KEYS.GROUP_BY, JSON.stringify(groupBy)); }, [groupBy]);
   useEffect(() => { localStorage.setItem(LS_KEYS.PROJECT_SORT, JSON.stringify(projectSort)); }, [projectSort]);
+  useEffect(() => { localStorage.setItem(LS_KEYS.OS_FILTER, JSON.stringify(osFilter)); }, [osFilter]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -123,30 +161,96 @@ const App: React.FC = () => {
 
   // --- Logic ---
 
-  // 1. Filter
+  // Extract unique OS values for the filter dropdown
+  const availableOS = useMemo(() => {
+    const osSet = new Set<string>();
+    allProjects.forEach(p => {
+       if (p.os) {
+         p.os.forEach(o => osSet.add(o));
+       }
+    });
+    return Array.from(osSet).sort();
+  }, [allProjects]);
+
   const filteredProjects = allProjects.filter(p => {
-    if (!searchTerm.trim()) return true;
-    const lower = searchTerm.toLowerCase();
-    return (
-      p.name.toLowerCase().includes(lower) ||
-      p.description.toLowerCase().includes(lower) ||
-      p.category.toLowerCase().includes(lower)
-    );
+    // 1. Search Filter
+    let matchesSearch = true;
+    if (searchTerm.trim()) {
+      const lower = searchTerm.toLowerCase();
+      matchesSearch = (
+        p.name.toLowerCase().includes(lower) ||
+        p.description.toLowerCase().includes(lower) ||
+        p.category.toLowerCase().includes(lower) ||
+        (p.keywords && p.keywords.some(k => k.toLowerCase().includes(lower)))
+      );
+    }
+    
+    // 2. OS Filter
+    let matchesOS = true;
+    if (osFilter !== 'ALL') {
+      matchesOS = p.os ? p.os.includes(osFilter) : false;
+    }
+
+    return matchesSearch && matchesOS;
   });
 
-  // 2. Sort
+  // --- Dynamic Theme Logic ---
+  useEffect(() => {
+    if (filteredProjects.length === 0) {
+      applyTheme(THEME_PALETTE.default);
+      return;
+    }
+
+    // 1. Count category frequency
+    const categoryCounts: Record<string, number> = {};
+    filteredProjects.forEach(p => {
+      const cat = p.category.toLowerCase();
+      // Map category name to theme key
+      let key = 'default';
+      if (cat.includes('vision') || cat.includes('video')) key = 'vision';
+      else if (cat.includes('audio') || cat.includes('speech')) key = 'audio';
+      else if (cat.includes('web')) key = 'web';
+      else if (cat.includes('security')) key = 'security';
+      else if (cat.includes('data')) key = 'data';
+      else if (cat.includes('design') || cat.includes('ui')) key = 'design';
+      else if (cat.includes('ai') || cat.includes('model') || cat.includes('coding') || cat.includes('agent')) key = 'ai';
+      
+      categoryCounts[key] = (categoryCounts[key] || 0) + 1;
+    });
+
+    // 2. Find dominant category
+    let dominantKey = 'default';
+    let maxCount = 0;
+    
+    Object.entries(categoryCounts).forEach(([key, count]) => {
+      if (count > maxCount) {
+        maxCount = count;
+        dominantKey = key;
+      }
+    });
+
+    const colors = THEME_PALETTE[dominantKey] || THEME_PALETTE.default;
+    applyTheme(colors);
+
+  }, [filteredProjects]);
+
+  const applyTheme = (colors: { main: string; dim: string; dark: string }) => {
+    const root = document.documentElement;
+    root.style.setProperty('--color-acid-main', colors.main);
+    root.style.setProperty('--color-acid-dim', colors.dim);
+    root.style.setProperty('--color-acid-dark', colors.dark);
+  };
+
   const sortedProjects = [...filteredProjects].sort((a, b) => {
     if (projectSort === 'rank') {
       const rankA = parseInt(a.rank.replace(/[^0-9]/g, '')) || 999;
       const rankB = parseInt(b.rank.replace(/[^0-9]/g, '')) || 999;
-      // Secondary sort by date if ranks equal (which they will be across episodes)
       if (rankA === rankB) return new Date(b.discoveredDate).getTime() - new Date(a.discoveredDate).getTime();
       return rankA - rankB;
     } 
     if (projectSort === 'name-asc') return a.name.localeCompare(b.name);
     if (projectSort === 'name-desc') return b.name.localeCompare(a.name);
     if (projectSort === 'date-newest') {
-       // Prefer created at if grouping by freshness, otherwise discovery date
        const dateA = a.githubStats?.createdAt || a.discoveredDate;
        const dateB = b.githubStats?.createdAt || b.discoveredDate;
        return new Date(dateB).getTime() - new Date(dateA).getTime();
@@ -159,54 +263,59 @@ const App: React.FC = () => {
     return 0;
   });
 
-  // 3. Group
   const groupedProjects = useMemo(() => {
     const groups: Record<string, typeof sortedProjects> = {};
 
     if (groupBy === 'none') {
-      groups['All Projects'] = sortedProjects;
+      groups['ALL_UNITS'] = sortedProjects;
       return groups;
     }
 
     sortedProjects.forEach(p => {
-      let key = 'Other';
+      let key = 'OTHER';
 
       if (groupBy === 'category') {
-        key = p.category || 'Uncategorized';
+        key = (p.category || 'UNCATEGORIZED').toUpperCase();
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(p);
       } 
       else if (groupBy === 'month') {
-        // Use discovery date for "Month" grouping as it represents when it trended
         const date = new Date(p.discoveredDate);
-        key = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        key = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).toUpperCase();
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(p);
       }
       else if (groupBy === 'freshness') {
         if (p.githubStats?.lastCommit) {
           const diffTime = Math.abs(new Date().getTime() - new Date(p.githubStats.lastCommit).getTime());
           const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-          if (diffDays <= 30) key = 'Bleeding Edge';
-          else if (diffDays <= 90) key = 'Stable';
-          else if (diffDays <= 180) key = 'Aging';
-          else key = 'Stale';
+          if (diffDays <= 30) key = 'FRESH_SIGNAL';
+          else if (diffDays <= 90) key = 'STABLE_CORE';
+          else if (diffDays <= 180) key = 'DECAYING';
+          else key = 'DORMANT';
         } else {
-          key = 'Unknown';
+          key = 'UNKNOWN_STATE';
         }
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(p);
       }
-
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(p);
+      else if (groupBy === 'os') {
+        const systems = p.os && p.os.length > 0 ? p.os : ['Other'];
+        systems.forEach(os => {
+          const upperOs = os.toUpperCase();
+          if (!groups[upperOs]) groups[upperOs] = [];
+          groups[upperOs].push(p);
+        });
+      }
     });
 
-    // Sort keys?
-    // Month: chronological desc
-    // Freshness: specific order
-    // Category: alpha
     const orderedGroups: Record<string, typeof sortedProjects> = {};
     let keys = Object.keys(groups);
 
     if (groupBy === 'month') {
-      keys.sort((a, b) => new Date(a).getTime() - new Date(b).getTime()).reverse(); // Newest month first
+      keys.sort((a, b) => new Date(a).getTime() - new Date(b).getTime()).reverse();
     } else if (groupBy === 'freshness') {
-      const order = ['Bleeding Edge', 'Stable', 'Aging', 'Stale', 'Unknown'];
+      const order = ['FRESH_SIGNAL', 'STABLE_CORE', 'DECAYING', 'DORMANT', 'UNKNOWN_STATE'];
       keys.sort((a, b) => order.indexOf(a) - order.indexOf(b));
     } else {
       keys.sort();
@@ -216,8 +325,6 @@ const App: React.FC = () => {
     return orderedGroups;
 
   }, [sortedProjects, groupBy]);
-
-  // --- Handlers ---
 
   const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
 
@@ -235,15 +342,13 @@ const App: React.FC = () => {
           addedCount = uniqueNew.length;
           return [...uniqueNew, ...prev];
         });
-        setSuccessMsg(addedCount > 0 
-          ? `Success! Added ${addedCount} new episodes.` 
-          : "Synced successfully. No new unique episodes found.");
+        setSuccessMsg(`SYNC_COMPLETE: ${addedCount} NEW_PACKETS`);
       } else {
-        setError("Gemini couldn't find any recent trending content.");
+        setError("SEARCH_FAILED: NO_TARGETS_FOUND");
       }
     } catch (err: any) {
       console.error("Aggregation error:", err);
-      setError(err instanceof Error ? err.message : "An unexpected error occurred.");
+      setError(err instanceof Error ? err.message : "SYSTEM_CRITICAL_FAILURE");
     } finally {
       setLoading(false);
     }
@@ -257,53 +362,107 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 transition-colors duration-200 flex flex-col">
-      <header className="sticky top-0 z-30 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800">
+    <div className={`min-h-screen flex flex-col font-mono selection:bg-acid selection:text-black transition-theme
+      ${theme === 'dark' ? 'bg-[#0a0a0a] bg-grid-pattern bg-[length:40px_40px]' : 'bg-[#e5e5e5] bg-grid-pattern-light bg-[length:40px_40px]'}
+    `}>
+      {/* --- INDUSTRIAL HEADER --- */}
+      <header className="sticky top-0 z-30 bg-concrete-100 dark:bg-concrete-950 border-b-2 border-concrete-900 dark:border-concrete-100 transition-theme">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row justify-between items-center py-4 space-y-4 md:space-y-0 gap-4">
-            <div className="flex items-center space-x-3 shrink-0">
-              <div className="bg-blue-600 p-2 rounded-lg"><Layers className="h-6 w-6 text-white" /></div>
-              <h1 className="text-xl font-bold tracking-tight hidden sm:block">Git<span className="text-blue-600">Trend</span> Aggregator</h1>
-              <h1 className="text-xl font-bold tracking-tight sm:hidden">GT<span className="text-blue-600">A</span></h1>
+          <div className="flex flex-col md:flex-row justify-between items-center py-4 space-y-4 md:space-y-0 gap-6">
+            
+            {/* Logo Unit */}
+            <div className="flex items-center space-x-3 shrink-0 group cursor-pointer select-none">
+              <div className="w-12 h-12 bg-acid text-black flex items-center justify-center border-2 border-black shadow-hard group-hover:translate-x-1 group-hover:translate-y-1 group-hover:shadow-none transition-all duration-300">
+                <Cpu className="h-8 w-8" strokeWidth={2.5} />
+              </div>
+              <div className="flex flex-col">
+                <h1 className="text-2xl font-black tracking-tighter uppercase leading-none text-black dark:text-white transition-theme">
+                  Git<span className="text-acid-dark dark:text-acid transition-theme">Trend</span>
+                </h1>
+                <span className="text-[10px] font-bold bg-black text-white px-1 py-0.5 w-max mt-1 tracking-widest">
+                  SYS.VER.2.0
+                </span>
+              </div>
             </div>
             
-            <div className="w-full md:flex-1 md:mx-8 flex justify-center">
-              <SearchBar value={inputValue} onChange={setInputValue} placeholder="Search projects..." />
+            {/* Search Module */}
+            <div className="w-full md:flex-1 md:mx-12">
+              <SearchBar value={inputValue} onChange={setInputValue} placeholder="EXECUTE SEARCH..." />
             </div>
 
+            {/* Control Panel */}
             <div className="flex items-center space-x-3 shrink-0">
-              <button onClick={toggleTheme} className="p-2.5 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500">
-                {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+              <button 
+                onClick={toggleTheme} 
+                className="w-12 h-12 flex items-center justify-center border-2 border-black dark:border-white bg-concrete-200 dark:bg-concrete-800 hover:bg-acid dark:hover:bg-acid text-black transition-all duration-300"
+                title="TOGGLE_VISUAL_MODE"
+              >
+                {theme === 'dark' ? <Sun className="h-6 w-6" /> : <Moon className="h-6 w-6" />}
               </button>
-              <button onClick={handleAggregate} disabled={loading} className={`flex items-center px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-all w-full md:w-auto justify-center ${loading ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 shadow-md hover:shadow-lg active:scale-95'}`}>
-                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                {loading ? 'Syncing...' : 'Sync New'}
+              
+              <button 
+                onClick={handleAggregate} 
+                disabled={loading} 
+                className={`h-12 flex items-center px-6 text-sm font-bold uppercase tracking-wider border-2 border-black dark:border-white transition-all duration-300
+                  ${loading 
+                    ? 'bg-concrete-300 cursor-not-allowed' 
+                    : 'bg-acid hover:bg-white hover:text-black text-black shadow-hard hover:shadow-none hover:translate-x-1 hover:translate-y-1'
+                  }`}
+              >
+                {loading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <RefreshCw className="mr-2 h-5 w-5" />}
+                {loading ? 'SYNCING...' : 'SYNC_DB'}
               </button>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full">
-        {error && <div className="mb-8 p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 flex items-start text-red-700 dark:text-red-300 animate-in fade-in slide-in-from-top-2"><AlertCircle className="h-5 w-5 mr-3 mt-0.5 flex-shrink-0" /><p>{error}</p></div>}
-        {successMsg && <div className="mb-8 p-4 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 flex items-start text-green-700 dark:text-green-300 animate-in fade-in slide-in-from-top-2"><CheckCircle className="h-5 w-5 mr-3 mt-0.5 flex-shrink-0" /><p>{successMsg}</p></div>}
+      {/* --- MAIN INTERFACE --- */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 flex-1 w-full relative">
+        {/* Alerts / System Messages */}
+        {error && (
+          <div className="mb-8 p-4 border-2 border-safety bg-safety/10 text-safety flex items-center shadow-hard animate-pulse">
+            <AlertCircle className="h-6 w-6 mr-4" />
+            <div>
+              <p className="font-bold text-lg">SYSTEM_ERROR</p>
+              <p className="font-mono text-sm">{error}</p>
+            </div>
+          </div>
+        )}
+        
+        {successMsg && (
+          <div className="mb-8 p-4 border-2 border-acid-dark bg-acid/10 text-acid-dark dark:text-acid flex items-center shadow-hard transition-theme">
+            <CheckCircle className="h-6 w-6 mr-4" />
+            <div>
+              <p className="font-bold text-lg">OPERATION_SUCCESS</p>
+              <p className="font-mono text-sm">{successMsg}</p>
+            </div>
+          </div>
+        )}
 
-        <div className="space-y-6">
-           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-             <div>
-               <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-                 Explore Projects
+        <div className="space-y-12">
+           {/* Data Header */}
+           <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-6 pb-6 border-b-2 border-dashed border-concrete-300 dark:border-concrete-800 transition-theme">
+             <div className="relative">
+               {/* Decorative corner mark */}
+               <div className="absolute -left-4 top-0 w-2 h-full bg-acid transition-theme"></div>
+               <h2 className="text-4xl md:text-5xl font-black uppercase tracking-tighter text-black dark:text-white transition-theme">
+                 Sector_Grid
                </h2>
-               <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
-                 {filteredProjects.length} projects curated from GitHub Trending
+               <p className="text-concrete-500 font-mono mt-2 flex items-center gap-2">
+                 <span className="w-2 h-2 bg-safety animate-pulse"></span>
+                 ACTIVE_NODES: <span className="text-black dark:text-white font-bold transition-theme">{filteredProjects.length}</span>
                </p>
              </div>
-             <div className="shrink-0 w-full sm:w-auto">
+             <div className="shrink-0 w-full xl:w-auto">
                <ViewControls
                  groupBy={groupBy}
                  setGroupBy={setGroupBy}
                  projectSort={projectSort}
                  setProjectSort={setProjectSort}
+                 osFilter={osFilter}
+                 setOsFilter={setOsFilter}
+                 availableOS={availableOS}
                />
              </div>
            </div>
@@ -317,9 +476,17 @@ const App: React.FC = () => {
         </div>
       </main>
       
-      <footer className="border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 mt-auto">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <p className="text-center text-sm text-gray-500 dark:text-gray-400">Powered by Google Gemini 2.5 Flash</p>
+      <footer className="border-t-2 border-black dark:border-white bg-concrete-200 dark:bg-black mt-auto transition-theme">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col md:flex-row justify-between items-center gap-4">
+          <p className="font-mono text-xs text-concrete-500 uppercase">
+            // TERMINAL_ID: G-772
+          </p>
+          <p className="font-bold text-sm uppercase tracking-widest text-black dark:text-white transition-theme">
+            POWERED_BY_GEMINI_MODEL_[FLASH]
+          </p>
+          <p className="font-mono text-xs text-concrete-500 uppercase">
+             STATUS: ONLINE
+          </p>
         </div>
       </footer>
 

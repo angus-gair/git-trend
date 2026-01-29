@@ -26,19 +26,26 @@ export const fetchTrendingEpisodes = async (): Promise<Episode[]> => {
       2. Select 3 to 5 of the most recent or relevant articles found.
       
       3. For EACH article selected, you MUST extract the COMPLETE list of projects.
-         - **CRITICAL**: The source content is typically formatted in Markdown with headers like "### No. X: Project Name" followed by a description, and then a bold "**GitHub:**" link.
-         - These lists are long (often 30+ items). You must scroll/read to the very end.
-         - You must extract **EVERY SINGLE PROJECT** in the list.
-         - Do **NOT** stop after the top 10. Do **NOT** summarize.
-         - Verify you have reached the end of the list (e.g., check for the highest rank number available in the text).
+         - **CRITICAL**: The source content is typically formatted in Markdown.
+         - You must extract **EVERY SINGLE PROJECT** in the list. Do not stop after top 10.
       
-      4. For each project, extract:
+      4. For each project, extract and ENRICH the data:
          - Rank (e.g., No.1)
          - Name (infer from the header or description)
-         - Full Description text (preserve the detail)
          - GitHub URL (look for the line starting with **GitHub:**)
-         - **Category**: Classify the project into one of the following based on its description:
-           ["Vision/Video", "Audio", "Coding Agent", "Dev Tool", "Web", "System", "Security", "AI Model", "Design/UI", "Chatbot", "Education", "Data"]
+         - **Category**: Classify the project into one of: ["Vision/Video", "Audio", "Coding Agent", "Dev Tool", "Web", "System", "Security", "AI Model", "Design/UI", "Chatbot", "Education", "Data"]
+         
+         - **DESCRIPTION REWRITE**: 
+           - Do NOT just copy the source text. 
+           - Analyze the text and the project context (using the GitHub URL as a reference for your internal knowledge).
+           - Rewrite the description to be **Technical and Comprehensive**.
+           - Explain WHAT the project does, HOW it works, and key technologies used.
+         
+         - **OS**: Infer supported Operating Systems: ["macOS", "Windows", "Linux", "Web", "Mobile", "Cross-platform"].
+         
+         - **KEYWORDS**: 
+           - Generate 5-10 specific search tags.
+           - Include programming languages (e.g., Rust, Python), Frameworks (e.g., React, PyTorch), and domain concepts (e.g., CLI, LLM, Vector Database).
       
       5. Extract the Article Title and Date.
 
@@ -91,10 +98,13 @@ export const createChatSession = (episodes: Episode[]): Chat => {
   const ai = getClient();
   
   // Construct a context summary from the episodes
-  // We limit the context per project to avoid hitting token limits with large lists
+  // We include keywords in the context so the AI knows about them
   const contextSummary = episodes.map(ep => 
     `Episode: ${ep.title} (${ep.date}) - ${ep.projects.length} Projects\nProjects:\n${ep.projects.map(p => 
-      `- [${p.category}] ${p.name} (${p.url}): ${p.description.substring(0, 150)}...`
+      `- [${p.category}] ${p.name} (${p.url})
+       OS: ${p.os?.join(', ')}
+       Keywords: ${p.keywords?.join(', ')}
+       Desc: ${p.description.substring(0, 200)}...`
     ).join('\n')}`
   ).join('\n\n');
 

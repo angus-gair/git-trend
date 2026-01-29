@@ -1,7 +1,7 @@
 import React from 'react';
-import { AlignLeft, Layers, Calendar, Zap, Tag, Grid } from 'lucide-react';
+import { Calendar, Zap, Tag, Grid, Monitor, List, Check, Filter } from 'lucide-react';
 
-export type GroupByOption = 'none' | 'month' | 'category' | 'freshness';
+export type GroupByOption = 'none' | 'month' | 'category' | 'freshness' | 'os';
 export type ProjectSortOption = 'rank' | 'name-asc' | 'name-desc' | 'date-newest' | 'date-oldest';
 
 interface ViewControlsProps {
@@ -9,69 +9,99 @@ interface ViewControlsProps {
   setGroupBy: (group: GroupByOption) => void;
   projectSort: ProjectSortOption;
   setProjectSort: (sort: ProjectSortOption) => void;
+  osFilter: string;
+  setOsFilter: (os: string) => void;
+  availableOS: string[];
 }
 
 const ViewControls: React.FC<ViewControlsProps> = ({
   groupBy,
   setGroupBy,
   projectSort,
-  setProjectSort
+  setProjectSort,
+  osFilter,
+  setOsFilter,
+  availableOS
 }) => {
+  const Tab = ({ active, onClick, icon: Icon, label }: any) => (
+    <button
+      onClick={onClick}
+      className={`
+        relative group flex items-center justify-center px-4 py-2 text-[10px] font-black uppercase tracking-widest border-2 border-black dark:border-concrete-400 transition-all
+        ${active 
+          ? 'bg-acid text-black translate-y-1' 
+          : 'bg-white dark:bg-black text-concrete-500 dark:text-concrete-400 hover:text-black dark:hover:text-white hover:border-acid'}
+      `}
+    >
+      {active && (
+         <div className="absolute top-0 right-0 p-0.5">
+            <div className="w-1.5 h-1.5 bg-black"></div>
+         </div>
+      )}
+      <Icon className="w-3 h-3 mr-2" />
+      {label}
+    </button>
+  );
+
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-gray-900 p-1.5 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm animate-fade-in">
+    <div className="flex flex-col xl:flex-row gap-6 w-full">
       
       {/* Group By Controls */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 px-2 scrollbar-hide">
-        <span className="text-xs text-gray-400 uppercase tracking-wider font-semibold whitespace-nowrap mr-1">Group By:</span>
-        
-        <button
-          onClick={() => setGroupBy('none')}
-          className={`flex items-center px-3 py-1.5 text-xs font-medium rounded-lg transition-all whitespace-nowrap ${groupBy === 'none' ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm ring-1 ring-gray-200 dark:ring-gray-700' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
-        >
-          <Grid className="w-3.5 h-3.5 mr-1.5" />
-          All
-        </button>
-
-        <button
-          onClick={() => setGroupBy('month')}
-          className={`flex items-center px-3 py-1.5 text-xs font-medium rounded-lg transition-all whitespace-nowrap ${groupBy === 'month' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 shadow-sm ring-1 ring-blue-100 dark:ring-blue-800' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
-        >
-          <Calendar className="w-3.5 h-3.5 mr-1.5" />
-          Month
-        </button>
-
-        <button
-          onClick={() => setGroupBy('category')}
-          className={`flex items-center px-3 py-1.5 text-xs font-medium rounded-lg transition-all whitespace-nowrap ${groupBy === 'category' ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 shadow-sm ring-1 ring-purple-100 dark:ring-purple-800' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
-        >
-          <Tag className="w-3.5 h-3.5 mr-1.5" />
-          Category
-        </button>
-
-        <button
-          onClick={() => setGroupBy('freshness')}
-          className={`flex items-center px-3 py-1.5 text-xs font-medium rounded-lg transition-all whitespace-nowrap ${groupBy === 'freshness' ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 shadow-sm ring-1 ring-green-100 dark:ring-green-800' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
-        >
-          <Zap className="w-3.5 h-3.5 mr-1.5" />
-          Freshness
-        </button>
+      <div className="flex flex-col gap-2">
+        <span className="text-[10px] font-mono font-bold uppercase text-concrete-500 ml-1">// ORGANIZE_BY</span>
+        <div className="flex flex-wrap gap-2">
+          <Tab active={groupBy === 'none'} onClick={() => setGroupBy('none')} icon={Grid} label="RAW" />
+          <Tab active={groupBy === 'month'} onClick={() => setGroupBy('month')} icon={Calendar} label="TIME" />
+          <Tab active={groupBy === 'category'} onClick={() => setGroupBy('category')} icon={Tag} label="TYPE" />
+          <Tab active={groupBy === 'freshness'} onClick={() => setGroupBy('freshness')} icon={Zap} label="LIVE" />
+          <Tab active={groupBy === 'os'} onClick={() => setGroupBy('os')} icon={Monitor} label="SYS" />
+        </div>
       </div>
 
-      <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 hidden sm:block"></div>
+      <div className="hidden xl:block w-px bg-concrete-300 dark:bg-concrete-700 mx-2"></div>
 
-      {/* Project Sort */}
-      <div className="flex items-center gap-2 px-2">
-         <span className="text-xs text-gray-400 uppercase tracking-wider font-semibold whitespace-nowrap">Sort:</span>
-         <select
-           value={projectSort}
-           onChange={(e) => setProjectSort(e.target.value as ProjectSortOption)}
-           className="bg-transparent text-gray-700 dark:text-gray-200 text-sm font-medium focus:outline-none focus:ring-0 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-         >
-           <option value="rank">Trending Rank</option>
-           <option value="date-newest">Newest First</option>
-           <option value="date-oldest">Oldest First</option>
-           <option value="name-asc">Name (A-Z)</option>
-         </select>
+      {/* Filters & Sorting */}
+      <div className="flex flex-col md:flex-row gap-4 flex-1">
+        
+        {/* OS Filter */}
+        <div className="flex flex-col gap-2 flex-1">
+          <span className="text-[10px] font-mono font-bold uppercase text-concrete-500 ml-1">// SYSTEM_FILTER</span>
+          <div className="relative">
+            <select
+              value={osFilter}
+              onChange={(e) => setOsFilter(e.target.value)}
+              className="w-full appearance-none bg-concrete-100 dark:bg-concrete-900 border-2 border-black dark:border-concrete-500 text-sm font-bold font-mono uppercase py-2 pl-4 pr-10 focus:outline-none focus:border-acid transition-colors cursor-pointer"
+            >
+              <option value="ALL">ALL SYSTEMS</option>
+              {availableOS.map(os => (
+                <option key={os} value={os}>{os.toUpperCase()}</option>
+              ))}
+            </select>
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-black dark:text-white bg-concrete-300 dark:bg-concrete-700 border-l-2 border-black dark:border-concrete-500">
+              <Filter className="h-4 w-4" />
+            </div>
+          </div>
+        </div>
+
+        {/* Project Sort */}
+        <div className="flex flex-col gap-2 flex-1">
+           <span className="text-[10px] font-mono font-bold uppercase text-concrete-500 ml-1">// SEQUENCE_BY</span>
+           <div className="relative">
+             <select
+               value={projectSort}
+               onChange={(e) => setProjectSort(e.target.value as ProjectSortOption)}
+               className="w-full appearance-none bg-concrete-100 dark:bg-concrete-900 border-2 border-black dark:border-concrete-500 text-sm font-bold font-mono uppercase py-2 pl-4 pr-10 focus:outline-none focus:border-acid transition-colors cursor-pointer"
+             >
+               <option value="rank">TREND_INDEX</option>
+               <option value="date-newest">DATE [DESC]</option>
+               <option value="date-oldest">DATE [ASC]</option>
+               <option value="name-asc">ALPHA [A-Z]</option>
+             </select>
+             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-black dark:text-white bg-concrete-300 dark:bg-concrete-700 border-l-2 border-black dark:border-concrete-500">
+               <List className="h-4 w-4" />
+             </div>
+           </div>
+        </div>
       </div>
     </div>
   );
