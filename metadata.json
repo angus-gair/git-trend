@@ -1,0 +1,5 @@
+{
+  "name": "GitTrend Aggregator",
+  "description": "An AI-powered aggregator for GitHub Trending episodes from githubawesome.com, featuring search and detailed project views.",
+  "requestFramePermissions": []
+}
