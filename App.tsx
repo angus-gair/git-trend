@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { RefreshCw, Search as SearchIcon, Layers, AlertCircle, Filter, Loader2, Sun, Moon, CheckCircle, Terminal, Cpu } from 'lucide-react';
+import { RefreshCw, Search as SearchIcon, Layers, AlertCircle, Filter, Loader2, Sun, Moon, CheckCircle, Terminal, Cpu, Settings, Power, Key, Network, Server, Database } from 'lucide-react';
 import { INITIAL_EPISODES } from './constants';
-import { Episode, Project, GithubStats } from './types';
+import { Episode, Project, AIConfig } from './types';
 import { fetchTrendingEpisodes } from './services/geminiService';
 import SearchBar from './components/SearchBar';
 import ProjectGroupList from './components/EpisodeList';
@@ -17,6 +17,16 @@ const LS_KEYS = {
   PROJECT_SORT: 'gitTrend_projectSort',
   OS_FILTER: 'gitTrend_osFilter',
   THEME: 'gitTrend_theme',
+  AI_CONFIG: 'gitTrend_ai_config',
+};
+
+// Default Configuration
+const DEFAULT_AI_CONFIG: AIConfig = {
+  provider: 'google',
+  googleModelId: 'gemini-3-flash-preview',
+  openaiBaseUrl: 'https://api.openai.com/v1',
+  openaiApiKey: '',
+  openaiModelId: 'gpt-4o',
 };
 
 // Theme Color Map
@@ -129,6 +139,13 @@ const App: React.FC = () => {
   
   // OS Filter State
   const [osFilter, setOsFilter] = useState<string>(() => loadState(LS_KEYS.OS_FILTER, 'ALL'));
+  
+  // AI Config State
+  const [aiConfig, setAiConfig] = useState<AIConfig>(() => loadState(LS_KEYS.AI_CONFIG, DEFAULT_AI_CONFIG));
+  
+  // Settings Menu State
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const settingsRef = useRef<HTMLDivElement>(null);
 
   const [selectedProject, setSelectedProject] = useState<{project: Project, episodeTitle?: string} | null>(null);
 
@@ -151,6 +168,7 @@ const App: React.FC = () => {
   useEffect(() => { localStorage.setItem(LS_KEYS.GROUP_BY, JSON.stringify(groupBy)); }, [groupBy]);
   useEffect(() => { localStorage.setItem(LS_KEYS.PROJECT_SORT, JSON.stringify(projectSort)); }, [projectSort]);
   useEffect(() => { localStorage.setItem(LS_KEYS.OS_FILTER, JSON.stringify(osFilter)); }, [osFilter]);
+  useEffect(() => { localStorage.setItem(LS_KEYS.AI_CONFIG, JSON.stringify(aiConfig)); }, [aiConfig]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -158,10 +176,24 @@ const App: React.FC = () => {
     else root.classList.remove('dark');
     localStorage.setItem(LS_KEYS.THEME, theme);
   }, [theme]);
+  
+  // Close settings when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (settingsRef.current && !settingsRef.current.contains(event.target as Node)) {
+        setIsSettingsOpen(false);
+      }
+    };
+    if (isSettingsOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isSettingsOpen]);
 
   // --- Logic ---
 
-  // Extract unique OS values for the filter dropdown
   const availableOS = useMemo(() => {
     const osSet = new Set<string>();
     allProjects.forEach(p => {
@@ -173,7 +205,6 @@ const App: React.FC = () => {
   }, [allProjects]);
 
   const filteredProjects = allProjects.filter(p => {
-    // 1. Search Filter
     let matchesSearch = true;
     if (searchTerm.trim()) {
       const lower = searchTerm.toLowerCase();
@@ -185,7 +216,6 @@ const App: React.FC = () => {
       );
     }
     
-    // 2. OS Filter
     let matchesOS = true;
     if (osFilter !== 'ALL') {
       matchesOS = p.os ? p.os.includes(osFilter) : false;
@@ -201,11 +231,9 @@ const App: React.FC = () => {
       return;
     }
 
-    // 1. Count category frequency
     const categoryCounts: Record<string, number> = {};
     filteredProjects.forEach(p => {
       const cat = p.category.toLowerCase();
-      // Map category name to theme key
       let key = 'default';
       if (cat.includes('vision') || cat.includes('video')) key = 'vision';
       else if (cat.includes('audio') || cat.includes('speech')) key = 'audio';
@@ -218,10 +246,8 @@ const App: React.FC = () => {
       categoryCounts[key] = (categoryCounts[key] || 0) + 1;
     });
 
-    // 2. Find dominant category
     let dominantKey = 'default';
     let maxCount = 0;
-    
     Object.entries(categoryCounts).forEach(([key, count]) => {
       if (count > maxCount) {
         maxCount = count;
@@ -326,14 +352,12 @@ const App: React.FC = () => {
 
   }, [sortedProjects, groupBy]);
 
-  const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
-
   const handleAggregate = async () => {
     setLoading(true);
     setError(null);
     setSuccessMsg(null);
     try {
-      const newEpisodes = await fetchTrendingEpisodes();
+      const newEpisodes = await fetchTrendingEpisodes(aiConfig);
       if (newEpisodes.length > 0) {
         let addedCount = 0;
         setEpisodes(prev => {
@@ -361,6 +385,26 @@ const App: React.FC = () => {
       .map(ep => ep.title);
   };
 
+  const triggerGoogleKeySelection = async () => {
+     try {
+        if ((window as any).aistudio && (window as any).aistudio.openSelectKey) {
+           await (window as any).aistudio.openSelectKey();
+           setSuccessMsg("UPLINK_KEY: UPDATED");
+        } else {
+           console.warn("AI Studio Key Selector not available in this environment.");
+           setError("ENV_ERROR: KEY_SELECTOR_MISSING");
+        }
+     } catch (e) {
+        console.error("Failed to select key", e);
+        setError("AUTH_FAILURE");
+     }
+  };
+
+  // --- Configuration Handlers ---
+  const updateAiConfig = (updates: Partial<AIConfig>) => {
+    setAiConfig(prev => ({ ...prev, ...updates }));
+  };
+
   return (
     <div className={`min-h-screen flex flex-col font-mono selection:bg-acid selection:text-black transition-theme
       ${theme === 'dark' ? 'bg-[#0a0a0a] bg-grid-pattern bg-[length:40px_40px]' : 'bg-[#e5e5e5] bg-grid-pattern-light bg-[length:40px_40px]'}
@@ -380,7 +424,7 @@ const App: React.FC = () => {
                   Git<span className="text-acid-dark dark:text-acid transition-theme">Trend</span>
                 </h1>
                 <span className="text-[10px] font-bold bg-black text-white px-1 py-0.5 w-max mt-1 tracking-widest">
-                  SYS.VER.2.0
+                  SYS.VER.2.5
                 </span>
               </div>
             </div>
@@ -391,15 +435,213 @@ const App: React.FC = () => {
             </div>
 
             {/* Control Panel */}
-            <div className="flex items-center space-x-3 shrink-0">
-              <button 
-                onClick={toggleTheme} 
-                className="w-12 h-12 flex items-center justify-center border-2 border-black dark:border-white bg-concrete-200 dark:bg-concrete-800 hover:bg-acid dark:hover:bg-acid text-black transition-all duration-300"
-                title="TOGGLE_VISUAL_MODE"
-              >
-                {theme === 'dark' ? <Sun className="h-6 w-6" /> : <Moon className="h-6 w-6" />}
-              </button>
+            <div className="flex items-center space-x-3 shrink-0 relative" ref={settingsRef}>
               
+              {/* SETTINGS TOGGLE */}
+              <button 
+                onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+                className={`w-12 h-12 flex items-center justify-center border-2 border-black dark:border-white 
+                  bg-black dark:bg-concrete-800 
+                  text-white 
+                  hover:bg-acid dark:hover:bg-acid hover:text-black 
+                  transition-all duration-300 
+                  ${isSettingsOpen ? 'bg-acid dark:bg-acid !text-black' : ''}`}
+                title="SYSTEM_CONFIG"
+              >
+                <Settings className={`h-6 w-6 ${isSettingsOpen ? 'animate-spin-slow' : ''}`} />
+              </button>
+
+              {/* SETTINGS MENU POP-OUT */}
+              {isSettingsOpen && (
+                <div className="absolute top-full right-0 mt-3 w-[340px] bg-concrete-100 dark:bg-concrete-950 border-2 border-black dark:border-white shadow-hard z-50 flex flex-col animate-fade-in-up origin-top-right">
+                    
+                    {/* Menu Header */}
+                    <div className="bg-black text-white dark:bg-concrete-900 px-4 py-3 flex justify-between items-center border-b-2 border-black dark:border-concrete-700">
+                        <span className="font-mono text-xs font-black tracking-widest text-acid">SYS_CONFIG</span>
+                        <div className="flex gap-1.5">
+                            <div className="w-1.5 h-1.5 rounded-full bg-safety animate-pulse"></div>
+                            <div className="w-1.5 h-1.5 rounded-full bg-acid animate-pulse delay-100"></div>
+                        </div>
+                    </div>
+
+                    {/* Menu Content */}
+                    <div className="p-4 space-y-6 max-h-[70vh] overflow-y-auto">
+                        
+                        {/* 1. VISUAL MODE */}
+                        <div className="flex flex-col gap-3">
+                            <label className="text-[10px] font-black uppercase text-concrete-500 tracking-wider">VISUAL_MODE</label>
+                            <div className="flex border-2 border-black dark:border-concrete-700">
+                                <button
+                                    onClick={() => setTheme('light')}
+                                    className={`flex-1 py-3 text-xs font-bold uppercase flex items-center justify-center gap-2 transition-colors
+                                      ${theme === 'light' 
+                                        ? 'bg-black text-white' 
+                                        : 'bg-transparent text-black dark:text-concrete-400 hover:bg-concrete-200 dark:hover:bg-concrete-900'}
+                                    `}
+                                >
+                                    <Sun className="w-3.5 h-3.5" /> LIGHT
+                                </button>
+                                <div className="w-[2px] bg-black dark:bg-concrete-700"></div>
+                                <button
+                                    onClick={() => setTheme('dark')}
+                                    className={`flex-1 py-3 text-xs font-bold uppercase flex items-center justify-center gap-2 transition-colors
+                                      ${theme === 'dark' 
+                                        ? 'bg-acid text-black' 
+                                        : 'bg-transparent text-black dark:text-concrete-400 hover:bg-concrete-200 dark:hover:bg-concrete-900'}
+                                    `}
+                                >
+                                     <Moon className="w-3.5 h-3.5" /> DARK
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* 2. PROVIDER SELECTION */}
+                        <div className="flex flex-col gap-3">
+                            <label className="text-[10px] font-black uppercase text-concrete-500 tracking-wider">AI_PROVIDER</label>
+                            <div className="flex border-2 border-black dark:border-concrete-700">
+                                <button
+                                    onClick={() => updateAiConfig({ provider: 'google' })}
+                                    className={`flex-1 py-2 text-xs font-bold uppercase transition-colors
+                                      ${aiConfig.provider === 'google' 
+                                        ? 'bg-acid text-black' 
+                                        : 'bg-transparent text-concrete-500 hover:bg-concrete-200 dark:hover:bg-concrete-900'}
+                                    `}
+                                >
+                                    GOOGLE GEMINI
+                                </button>
+                                <div className="w-[2px] bg-black dark:bg-concrete-700"></div>
+                                <button
+                                    onClick={() => updateAiConfig({ provider: 'openai' })}
+                                    className={`flex-1 py-2 text-xs font-bold uppercase transition-colors
+                                      ${aiConfig.provider === 'openai' 
+                                        ? 'bg-acid text-black' 
+                                        : 'bg-transparent text-concrete-500 hover:bg-concrete-200 dark:hover:bg-concrete-900'}
+                                    `}
+                                >
+                                    OPENAI / COMPAT
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* 3. PROVIDER SPECIFIC SETTINGS */}
+                        {aiConfig.provider === 'google' ? (
+                          <>
+                            <div className="flex flex-col gap-3">
+                                <label className="text-[10px] font-black uppercase text-concrete-500 tracking-wider">GEMINI_MODEL</label>
+                                <div className="flex flex-col gap-2">
+                                    <button
+                                        onClick={() => updateAiConfig({ googleModelId: 'gemini-3-flash-preview' })}
+                                        className={`w-full py-2 px-3 border-2 text-xs font-bold uppercase flex items-center justify-between transition-all
+                                            ${aiConfig.googleModelId === 'gemini-3-flash-preview' 
+                                                ? 'border-black dark:border-white bg-black text-white dark:bg-white dark:text-black' 
+                                                : 'border-concrete-400 dark:border-concrete-700 text-concrete-600 dark:text-concrete-400 hover:border-black dark:hover:border-white'}
+                                        `}
+                                    >
+                                        <span>GEMINI 3 FLASH</span>
+                                        {aiConfig.googleModelId === 'gemini-3-flash-preview' && <CheckCircle className="w-3 h-3" />}
+                                    </button>
+                                    <button
+                                        onClick={() => updateAiConfig({ googleModelId: 'gemini-3-pro-preview' })}
+                                        className={`w-full py-2 px-3 border-2 text-xs font-bold uppercase flex items-center justify-between transition-all
+                                            ${aiConfig.googleModelId === 'gemini-3-pro-preview' 
+                                                ? 'border-black dark:border-white bg-black text-white dark:bg-white dark:text-black' 
+                                                : 'border-concrete-400 dark:border-concrete-700 text-concrete-600 dark:text-concrete-400 hover:border-black dark:hover:border-white'}
+                                        `}
+                                    >
+                                        <span>GEMINI 3 PRO</span>
+                                        {aiConfig.googleModelId === 'gemini-3-pro-preview' && <CheckCircle className="w-3 h-3" />}
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="flex flex-col gap-2 pt-2 border-t border-dashed border-concrete-300 dark:border-concrete-700">
+                                 <button
+                                    onClick={triggerGoogleKeySelection}
+                                    className="w-full py-2 border-2 border-transparent bg-concrete-200 dark:bg-concrete-800 hover:bg-safety hover:text-black text-xs font-bold uppercase transition-colors flex items-center justify-center gap-2"
+                                 >
+                                    <Key className="w-3 h-3" />
+                                    UPDATE GOOGLE API KEY
+                                 </button>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                             {/* OPENAI COMPAT SETTINGS */}
+                             <div className="flex flex-col gap-3">
+                                <label className="text-[10px] font-black uppercase text-concrete-500 tracking-wider">BASE_URL</label>
+                                <div className="relative">
+                                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <Server className="h-3 w-3 text-concrete-400" />
+                                  </div>
+                                  <input 
+                                    type="text" 
+                                    value={aiConfig.openaiBaseUrl}
+                                    onChange={(e) => updateAiConfig({ openaiBaseUrl: e.target.value })}
+                                    placeholder="https://api.openai.com/v1"
+                                    className="w-full pl-9 pr-3 py-2 bg-white dark:bg-black border-2 border-concrete-300 dark:border-concrete-700 text-xs font-mono focus:border-acid focus:outline-none"
+                                  />
+                                </div>
+                             </div>
+
+                             <div className="flex flex-col gap-3">
+                                <label className="text-[10px] font-black uppercase text-concrete-500 tracking-wider">API_KEY</label>
+                                <div className="relative">
+                                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <Key className="h-3 w-3 text-concrete-400" />
+                                  </div>
+                                  <input 
+                                    type="password" 
+                                    value={aiConfig.openaiApiKey}
+                                    onChange={(e) => updateAiConfig({ openaiApiKey: e.target.value })}
+                                    placeholder="sk-..."
+                                    className="w-full pl-9 pr-3 py-2 bg-white dark:bg-black border-2 border-concrete-300 dark:border-concrete-700 text-xs font-mono focus:border-acid focus:outline-none"
+                                  />
+                                </div>
+                             </div>
+
+                             <div className="flex flex-col gap-3">
+                                <label className="text-[10px] font-black uppercase text-concrete-500 tracking-wider">MODEL_ID</label>
+                                <div className="relative">
+                                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <Database className="h-3 w-3 text-concrete-400" />
+                                  </div>
+                                  <input 
+                                    type="text" 
+                                    value={aiConfig.openaiModelId}
+                                    onChange={(e) => updateAiConfig({ openaiModelId: e.target.value })}
+                                    placeholder="gpt-4o"
+                                    className="w-full pl-9 pr-3 py-2 bg-white dark:bg-black border-2 border-concrete-300 dark:border-concrete-700 text-xs font-mono focus:border-acid focus:outline-none"
+                                  />
+                                </div>
+                             </div>
+                          </>
+                        )}
+                        
+                        {/* Status Section */}
+                        <div className="flex flex-col gap-3 opacity-75 pt-2 border-t border-dashed border-concrete-400">
+                             <label className="text-[10px] font-black uppercase text-concrete-500 tracking-wider">SYSTEM_STATUS</label>
+                             <div className="flex flex-col gap-2">
+                                <div className="flex items-center justify-between text-xs font-bold border-b border-dashed border-concrete-400 dark:border-concrete-700 pb-1">
+                                   <span className="text-black dark:text-concrete-300">PROVIDER</span>
+                                   <span className="text-acid">{aiConfig.provider.toUpperCase()}</span>
+                                </div>
+                                <div className="flex items-center justify-between text-xs font-bold border-b border-dashed border-concrete-400 dark:border-concrete-700 pb-1">
+                                   <span className="text-black dark:text-concrete-300">MODEL</span>
+                                   <span className="text-acid truncate max-w-[120px]">
+                                     {aiConfig.provider === 'google' ? aiConfig.googleModelId : aiConfig.openaiModelId}
+                                   </span>
+                                </div>
+                             </div>
+                        </div>
+                    </div>
+
+                    {/* Menu Footer */}
+                     <div className="bg-concrete-200 dark:bg-concrete-900 px-4 py-2 border-t-2 border-black dark:border-concrete-700 text-[9px] font-mono text-center text-concrete-500">
+                        build_v2.5.0 // secure
+                    </div>
+                </div>
+              )}
+              
+              {/* Sync Button */}
               <button 
                 onClick={handleAggregate} 
                 disabled={loading} 
@@ -482,7 +724,7 @@ const App: React.FC = () => {
             // TERMINAL_ID: G-772
           </p>
           <p className="font-bold text-sm uppercase tracking-widest text-black dark:text-white transition-theme">
-            POWERED_BY_GEMINI_MODEL_[FLASH]
+            POWERED_BY_{aiConfig.provider.toUpperCase()}
           </p>
           <p className="font-mono text-xs text-concrete-500 uppercase">
              STATUS: ONLINE
@@ -496,7 +738,7 @@ const App: React.FC = () => {
         isOpen={!!selectedProject}
         onClose={() => setSelectedProject(null)}
       />
-      <ChatAssistant episodes={episodes} />
+      <ChatAssistant episodes={episodes} aiConfig={aiConfig} />
     </div>
   );
 };

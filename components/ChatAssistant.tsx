@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Send, Terminal, Cpu } from 'lucide-react';
-import { Chat, GenerateContentResponse } from "@google/genai";
-import { Episode } from '../types';
+import { X, Send, Terminal, Cpu, Network } from 'lucide-react';
+import { Episode, AIConfig, ChatSession } from '../types';
 import { createChatSession } from '../services/geminiService';
 
 interface Message {
@@ -11,36 +10,32 @@ interface Message {
 
 interface ChatAssistantProps {
   episodes: Episode[];
+  aiConfig: AIConfig;
 }
 
-const ChatAssistant: React.FC<ChatAssistantProps> = ({ episodes }) => {
+const ChatAssistant: React.FC<ChatAssistantProps> = ({ episodes, aiConfig }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     { role: 'model', text: "TERMINAL_LINK_ESTABLISHED. QUERY_DATABASE..." }
   ]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const chatSessionRef = useRef<Chat | null>(null);
+  const chatSessionRef = useRef<ChatSession | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [hasInitialized, setHasInitialized] = useState(false);
 
+  // Re-initialize if critical config changes
   useEffect(() => {
-    if (isOpen && !hasInitialized) {
-      try {
-        chatSessionRef.current = createChatSession(episodes);
-        setHasInitialized(true);
-      } catch (error) {
-        console.error("Failed to initialize chat session", error);
-      }
+    if (isOpen) {
+        setHasInitialized(false);
+        try {
+            chatSessionRef.current = createChatSession(episodes, aiConfig);
+            setHasInitialized(true);
+        } catch (e) {
+            console.error("Failed to init chat", e);
+        }
     }
-  }, [isOpen, hasInitialized, episodes]);
-
-  useEffect(() => {
-    if (!isOpen) {
-      setHasInitialized(false);
-      setMessages([{ role: 'model', text: "TERMINAL_LINK_ESTABLISHED. QUERY_DATABASE..." }]);
-    }
-  }, [episodes.length]);
+  }, [aiConfig.provider, aiConfig.googleModelId, aiConfig.openaiBaseUrl, aiConfig.openaiModelId, aiConfig.openaiApiKey, episodes]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -61,17 +56,15 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ episodes }) => {
 
     try {
       if (!chatSessionRef.current) {
-        chatSessionRef.current = createChatSession(episodes);
-        setHasInitialized(true);
+         chatSessionRef.current = createChatSession(episodes, aiConfig);
       }
 
-      const result = await chatSessionRef.current.sendMessageStream({ message: userMsg });
+      const stream = chatSessionRef.current.sendMessageStream({ message: userMsg });
       let fullResponse = "";
       setMessages(prev => [...prev, { role: 'model', text: "" }]);
 
-      for await (const chunk of result) {
-        const c = chunk as GenerateContentResponse;
-        const text = c.text;
+      for await (const chunk of stream) {
+        const text = chunk.text;
         if (text) {
           fullResponse += text;
           setMessages(prev => {
@@ -106,8 +99,10 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ episodes }) => {
       {/* Terminal Header */}
       <div className="flex items-center justify-between p-2 bg-acid text-black border-b-2 border-black">
         <div className="flex items-center gap-2">
-          <Cpu className="w-4 h-4" />
-          <h3 className="font-bold tracking-widest text-xs">COMMS_LINK_V2</h3>
+          {aiConfig.provider === 'google' ? <Cpu className="w-4 h-4" /> : <Network className="w-4 h-4" />}
+          <h3 className="font-bold tracking-widest text-xs uppercase">
+             LINK // {aiConfig.provider === 'google' ? aiConfig.googleModelId : aiConfig.openaiModelId}
+          </h3>
         </div>
         <button 
           onClick={() => setIsOpen(false)}

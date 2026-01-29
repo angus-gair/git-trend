@@ -13,15 +13,23 @@ interface ProjectCardProps {
 const ProjectCard: React.FC<ProjectCardProps> = ({ project, episodeTitle, date, onClick, searchTerm = '' }) => {
   // Highlight helper
   const getHighlightedText = (text: string, highlight: string) => {
-    if (!highlight.trim()) return text;
-    const escapedHighlight = highlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (!highlight || !highlight.trim()) return text;
+
+    // Escape regex characters to prevent invalid regex errors and ensure literal matching
+    const escapedHighlight = highlight.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    
+    // Create regex with global and case-insensitive flags
     const regex = new RegExp(`(${escapedHighlight})`, 'gi');
+    
+    // Split text by regex. Capturing groups are included in the result at odd indices.
+    // e.g., "Hello World".split(/(ell)/i) -> ["H", "ell", "o World"]
     const parts = text.split(regex);
     
     return parts.map((part, index) => {
-      if (part.toLowerCase() === highlight.toLowerCase()) {
+      // Odd indices are the matches captured by the regex group
+      if (index % 2 === 1) {
         return (
-          <mark key={index} className="bg-acid text-black font-bold px-1">
+          <mark key={index} className="bg-acid text-black font-bold px-0.5">
             {part}
           </mark>
         );

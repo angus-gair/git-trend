@@ -30,3 +30,15 @@ export interface SearchResult {
   episodeTitle: string;
   project: Project;
 }
+
+export interface AIConfig {
+  provider: 'google' | 'openai';
+  googleModelId: string;
+  openaiBaseUrl: string;
+  openaiApiKey: string;
+  openaiModelId: string;
+}
+
+export interface ChatSession {
+  sendMessageStream: (params: { message: string }) => AsyncGenerator<{ text: string }, void, unknown>;
+}
