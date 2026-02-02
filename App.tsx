@@ -31,18 +31,18 @@ const DEFAULT_AI_CONFIG: AIConfig = {
 
 // Theme Color Map
 const THEME_PALETTE: Record<string, { main: string; dim: string; dark: string }> = {
-  default: { main: '#ccff00', dim: '#a3cc00', dark: '#7a9900' }, // Acid Green
-  vision: { main: '#d946ef', dim: '#c026d3', dark: '#a21caf' },   // Neon Purple
-  video: { main: '#d946ef', dim: '#c026d3', dark: '#a21caf' },
-  audio: { main: '#f97316', dim: '#ea580c', dark: '#c2410c' },    // Neon Orange
-  speech: { main: '#f97316', dim: '#ea580c', dark: '#c2410c' },
-  web: { main: '#06b6d4', dim: '#0891b2', dark: '#0e7490' },      // Cyan
-  security: { main: '#ef4444', dim: '#dc2626', dark: '#b91c1c' }, // Red
-  data: { main: '#10b981', dim: '#059669', dark: '#047857' },     // Emerald
-  design: { main: '#ec4899', dim: '#db2777', dark: '#be185d' },   // Pink
-  ui: { main: '#ec4899', dim: '#db2777', dark: '#be185d' },
-  ai: { main: '#8b5cf6', dim: '#7c3aed', dark: '#6d28d9' },       // Violet
-  model: { main: '#8b5cf6', dim: '#7c3aed', dark: '#6d28d9' },
+  default: { main: '#FFD700', dim: '#FFA500', dark: '#FF8C00' },   // Gold/Yellow (default state)
+  vision: { main: '#d946ef', dim: '#c026d3', dark: '#a21caf' },    // Neon Purple (when searching)
+  video: { main: '#d946ef', dim: '#c026d3', dark: '#a21caf' },     // Neon Purple (when searching)
+  audio: { main: '#d946ef', dim: '#c026d3', dark: '#a21caf' },     // Purple (unified)
+  speech: { main: '#d946ef', dim: '#c026d3', dark: '#a21caf' },    // Purple (unified)
+  web: { main: '#d946ef', dim: '#c026d3', dark: '#a21caf' },       // Purple (unified)
+  security: { main: '#d946ef', dim: '#c026d3', dark: '#a21caf' },  // Purple (unified)
+  data: { main: '#d946ef', dim: '#c026d3', dark: '#a21caf' },     // Purple (unified)
+  design: { main: '#d946ef', dim: '#c026d3', dark: '#a21caf' },    // Purple (unified)
+  ui: { main: '#d946ef', dim: '#c026d3', dark: '#a21caf' },       // Purple (unified)
+  ai: { main: '#d946ef', dim: '#c026d3', dark: '#a21caf' },       // Purple (unified)
+  model: { main: '#d946ef', dim: '#c026d3', dark: '#a21caf' },    // Purple (unified)
 };
 
 // Helper to load state safely
