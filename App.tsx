@@ -31,7 +31,7 @@ const DEFAULT_AI_CONFIG: AIConfig = {
 
 // Theme Color Map
 const THEME_PALETTE: Record<string, { main: string; dim: string; dark: string }> = {
-  default: { main: '#FFD700', dim: '#FFA500', dark: '#FF8C00' },   // Gold/Yellow (default state)
+  default: { main: '#ccff00', dim: '#a3cc00', dark: '#7a9900' },   // Acid Green (default state)
   vision: { main: '#d946ef', dim: '#c026d3', dark: '#a21caf' },    // Neon Purple (when searching)
   video: { main: '#d946ef', dim: '#c026d3', dark: '#a21caf' },     // Neon Purple (when searching)
   audio: { main: '#d946ef', dim: '#c026d3', dark: '#a21caf' },     // Purple (unified)
